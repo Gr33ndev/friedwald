@@ -175,6 +175,8 @@
             text-decoration: none;
         }
         .imprint-link:hover { background: rgba(255, 255, 255, 0.95); }
+        .imprint-link a { color: inherit; text-decoration: none; }
+        .imprint-link a:hover { text-decoration: underline; }
 
         .popup-container h3 { margin-top: 0; }
         .popup-body { max-height: 400px; overflow-y: auto; }
@@ -260,8 +262,20 @@
         }
 
         @media (max-width: 768px) {
-            .search-bar { top: auto; bottom: 10px; width: 90%; }
+            .search-bar { top: auto; bottom: 40px; width: 90%; }
             .search-bar input { width: 100%; font-size: 16px; }
+
+            .imprint-link {
+                left: 50%;
+                transform: translateX(-50%);
+                bottom: 4px;
+                font-size: 10px;
+                white-space: nowrap;
+                max-width: 96vw;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-align: center;
+            }
 
             .wald-picker {
                 top: 10px;
@@ -274,7 +288,7 @@
 
             .filter-chips {
                 top: auto;
-                bottom: 95px;
+                bottom: 125px;
                 width: 95%;
                 justify-content: center;
                 max-height: 30vh;
@@ -418,7 +432,10 @@
     <div id="editModalBody" class="popup-body"></div>
 </div>
 
-<a class="imprint-link" href="https://gr33ndev.github.io/imprint/" target="_blank" rel="noopener">&copy; 2026 Gilian Rehm · Imprint &amp; Privacy</a>
+<div class="imprint-link">
+    Daten &copy; <a href="https://www.friedwald.de/" target="_blank" rel="noopener">FriedWald GmbH</a> — inoffizielle App ·
+    <a href="https://gr33ndev.github.io/imprint/" target="_blank" rel="noopener">&copy; 2026 Gilian Rehm · Imprint &amp; Privacy</a>
+</div>
 
 <div id="map"></div>
 
