@@ -162,6 +162,20 @@
             max-width: 360px;
         }
 
+        .imprint-link {
+            position: fixed;
+            bottom: 4px;
+            left: 6px;
+            z-index: 1001;
+            font-size: 11px;
+            color: #333;
+            background: rgba(255, 255, 255, 0.75);
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-decoration: none;
+        }
+        .imprint-link:hover { background: rgba(255, 255, 255, 0.95); }
+
         .popup-container h3 { margin-top: 0; }
         .popup-body { max-height: 400px; overflow-y: auto; }
         button.close { top: 10px; right: 10px; position: absolute; cursor: pointer; border: none; background: none; font-size: 1.2em; }
@@ -389,6 +403,12 @@
         <label><input id="colorCodingTogglePopup" checked onclick="applySettingsFromPopup()" type="checkbox"/> Farbkodierung einschalten</label><br><br>
         <label><input id="hideLocationTogglePopup" onclick="applySettingsFromPopup()" type="checkbox"/> Aktuellen Standort ausblenden</label><br><br>
         <label><input id="followLocationTogglePopup" onclick="applySettingsFromPopup()" type="checkbox"/> Aktuellem Standort folgen</label>
+        <footer style="text-align: center; padding-top: 1rem; margin-top: 1rem; border-top: 1px solid #ccc; color: #666; font-size: 0.85rem;">
+            &copy; 2026 Gilian Rehm<br>
+            <a href="https://gr33ndev.github.io/imprint/" target="_blank" rel="noopener"
+               style="color: inherit; text-decoration: none; margin-top: 4px; display: inline-block;">Imprint &amp;
+                Privacy</a>
+        </footer>
     </div>
 </div>
 
@@ -397,6 +417,8 @@
     <button class="close" onclick="closeEditModal()"><i class="fa fa-close"></i></button>
     <div id="editModalBody" class="popup-body"></div>
 </div>
+
+<a class="imprint-link" href="https://gr33ndev.github.io/imprint/" target="_blank" rel="noopener">&copy; 2026 Gilian Rehm · Imprint &amp; Privacy</a>
 
 <div id="map"></div>
 
