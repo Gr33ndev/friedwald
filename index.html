@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FriedWald Baumfinder</title>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+    <link href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+    <style>
+        body { margin: 0; font-family: sans-serif; }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            touch-action: manipulation;
+        }
+
+        /* Search bar */
+        .search-bar {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        /* Wald picker — separate from the search bar so the dropdown never crowds it */
+        .wald-picker {
+            position: absolute;
+            top: 10px;
+            left: 70px;
+            z-index: 1001;
+            background: white;
+            padding: 6px 12px;
+            border-radius: 25px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 280px;
+            color: #007bff;
+        }
+        .wald-picker select {
+            border: none;
+            outline: none;
+            background: transparent;
+            font-size: 14px;
+            color: #222;
+            max-width: 220px;
+            cursor: pointer;
+        }
+
+        .search-bar input {
+            border: none;
+            outline: none;
+            padding: 8px 12px;
+            border-radius: 15px;
+            font-size: 16px;
+            width: 180px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+
+        .search-bar button {
+            padding: 8px 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            min-width: 40px;
+            min-height: 40px;
+            transition: background-color 0.3s ease;
+        }
+
+        .search-bar button:hover { background-color: #0056b3; }
+
+        /* Filter chips row */
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            position: absolute;
+            top: 85px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001;
+            max-width: 90%;
+            justify-content: center;
+        }
+
+        .chip {
+            background: #f0f0f0;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s ease, transform 0.05s ease;
+        }
+
+        .chip:hover { background: #e6e6e6; }
+        .chip:active { transform: scale(0.97); }
+
+        .chip span {
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 0 2px;
+        }
+
+        .chip span:hover { color: red; }
+
+        .chip-count {
+            background: #007bff;
+            color: white;
+            font-weight: 600;
+            cursor: default;
+        }
+        .chip-count:hover { background: #007bff; }
+
+        .chip-reset {
+            background: #ffe5e5;
+            color: #b00020;
+        }
+        .chip-reset:hover { background: #ffd0d0; }
+
+        /* Popup containers */
+        .popup-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1002;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: none;
+            box-sizing: border-box;
+            width: auto;
+            min-width: 280px;
+            max-width: 360px;
+        }
+
+        .popup-container h3 { margin-top: 0; }
+        .popup-body { max-height: 400px; overflow-y: auto; }
+        button.close { top: 10px; right: 10px; position: absolute; cursor: pointer; border: none; background: none; font-size: 1.2em; }
+
+        /* Settings button */
+        .settings-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1001;
+            background: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            font-size: 24px;
+            line-height: 1;
+        }
+        .settings-button:hover { background-color: #0056b3; }
+
+        /* Tree labels */
+        .tree-number-label {
+            text-align: center;
+            font-size: 12px;
+            color: black;
+            white-space: nowrap;
+            width: 0 !important;
+            margin-left: -12px !important;
+        }
+        .tree-number-label span { display: block; }
+
+        /* Legend */
+        .map-legend {
+            position: absolute;
+            top: 90px;
+            left: 10px;
+            background: lightgrey;
+            opacity: 0.92;
+            padding: 10px 14px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            z-index: 1002;
+            font-size: 14px;
+            max-width: 220px;
+        }
+        .map-legend h4 { margin: 0 0 8px 0; font-size: 16px; }
+
+        .legend-color {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            flex-shrink: 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            padding: 2px 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            line-height: 1.3;
+        }
+        .legend-item:hover { background: rgba(255, 255, 255, 0.5); }
+
+        /* Loading Indicator */
+        #loadingIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .search-bar { top: auto; bottom: 10px; width: 90%; }
+            .search-bar input { width: 100%; font-size: 16px; }
+
+            .wald-picker {
+                top: 10px;
+                left: 60px;
+                right: 60px;
+                max-width: none;
+                padding: 4px 10px;
+            }
+            .wald-picker select { font-size: 13px; max-width: 100%; flex: 1; min-width: 0; }
+
+            .filter-chips {
+                top: auto;
+                bottom: 95px;
+                width: 95%;
+                justify-content: center;
+                max-height: 30vh;
+                overflow-y: auto;
+                padding: 4px;
+            }
+
+            .settings-button {
+                padding: 6px 10px;
+                font-size: 18px;
+            }
+
+            .map-legend {
+                font-size: 12px;
+                padding: 6px 10px 8px;
+                max-height: 55vh;
+                overflow-y: auto;
+            }
+            .map-legend h4 { font-size: 13px; margin-bottom: 6px; }
+            .legend-color { width: 12px; height: 12px; margin-right: 6px; }
+            .legend-item { padding: 1px 3px; line-height: 1.2; }
+
+            .popup-container {
+                width: 92%;
+                max-width: none;
+                max-height: 80vh;
+                overflow-y: auto;
+            }
+            .popup-body { max-height: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="search-bar">
+    <button class="legend-toggle-button" onclick="toggleLegend()"><i class="fa fa-info-circle"></i></button>
+    <input id="treeNumberInput" onblur="enableZoom()" onfocus="disableZoom()" onkeypress="handleEnter(event)" placeholder="Baumnummer eingeben" type="text"/>
+    <button onclick="searchTree()"><i class="fa fa-search"></i></button>
+    <button onclick="openFilterPopup()"><i class="fa fa-filter"></i></button>
+</div>
+
+<div class="wald-picker">
+    <i class="fa fa-tree"></i>
+    <select id="waldSelect" onchange="onWaldChange()" aria-label="Wald wählen">
+        <option value="">FriedWald wählen…</option>
+    </select>
+</div>
+
+<div id="filterChips" class="filter-chips"></div>
+
+<div class="settings-button" onclick="openSettingsPopup()"><i class="fa fa-cog"></i></div>
+
+<div id="loadingIndicator">Lade FriedWald-Standorte…</div>
+
+<div id="mapLegend" class="map-legend" style="display: block;">
+    <h4>Legende</h4>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '0')"><span class="legend-color" style="background:red; border: 3px solid red;"></span>Besetzt</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('Grabart', 'Basisplatz')"><span class="legend-color" style="background:yellow; border: 3px solid yellow;"></span>Basisplatz 590€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '890')"><span class="legend-color" style="background:blue; border: 3px solid yellow;"></span>Platz 890€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '1190')"><span class="legend-color" style="background:green; border: 3px solid yellow;"></span>Platz 1190€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '1390')"><span class="legend-color" style="background:black; border: 3px solid yellow;"></span>Platz 1390€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '2890')"><span class="legend-color" style="background:lightpink; border: 3px solid lightpink;"></span>Baum 2890€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '3490')"><span class="legend-color" style="background:white; border: 3px solid white;"></span>Baum 3490€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '3990')"><span class="legend-color" style="background:grey; border: 3px solid grey;"></span>Baum 3990€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '4490')"><span class="legend-color" style="background:lightgreen; border: 3px solid lightgreen;"></span>Baum 4490€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '4990')"><span class="legend-color" style="background:#eb5e5b; border: 3px solid #eb5e5b;"></span>Baum 4990€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '5490')"><span class="legend-color" style="background:purple; border: 3px solid purple;"></span>Baum 5490€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '5990')"><span class="legend-color" style="background:brown; border: 3px solid brown;"></span>Baum 5990€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '6490')"><span class="legend-color" style="background:black; border: 3px solid black;"></span>Baum 6490€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '6990')"><span class="legend-color" style="background:orange; border: 3px solid orange;"></span>Baum 6990€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', '7490')"><span class="legend-color" style="background:lightblue; border: 3px solid lightblue;"></span>Baum 7490€</div>
+    <div class="legend-item" onclick="applyFiltersFromLegend('price', 'andere')"><span class="legend-color" style="background:darkgrey; border: 3px solid green;"></span>Andere</div>
+</div>
+
+<div id="filterPopup" class="popup-container">
+    <h3>Filter</h3>
+    <button class="close" onclick="closeFilterPopup()"><i class="fa fa-close"></i></button>
+    <div class="popup-body">
+        <label><input id="occupiedTogglePopup" checked onclick="applyFiltersFromPopup()" type="checkbox"/> Besetzte Bäume ausblenden</label><br><br>
+
+        <label for="grabartSelect">Grabart:</label><br>
+        <select id="grabartSelect" onchange="applyFiltersFromPopup()">
+            <option value="">Alle</option>
+            <option value="Basisplatz">Basisplatz</option>
+            <option value="Platz">Platz</option>
+            <option value="Baum">Baum</option>
+            <option value="Einzelbaum">Einzelbaum</option>
+            <option value="Familienbaum">Familienbaum</option>
+            <option value="Freundschaftsbaum">Freundschaftsbaum</option>
+            <option value="Partnerbaum">Partnerbaum</option>
+            <option value="Basisgemeinschaftsbaum-Platz">Basisgemeinschaftsbaum-Platz</option>
+            <option value="Gemeinschaftsbaum-Platz">Gemeinschaftsbaum-Platz</option>
+            <option value="Prachtgemeinschaftsbaum-Platz">Prachtgemeinschaftsbaum-Platz</option>
+            <option value="Sternschnuppenbaum-Platz">Sternschnuppenbaum-Platz</option>
+            <option value="andere">andere...</option>
+        </select><br><br>
+
+        <label>Baumpreis:</label><br>
+        <div id="baumpreisCheckboxes"></div>
+        <br>
+
+        <label for="baumartSelect">Baumart:</label><br>
+        <select id="baumartSelect" onchange="applyFiltersFromPopup()">
+            <option value="">Alle</option>
+        </select><br><br>
+
+        <label>Gebiet:</label><br>
+        <div id="areaCheckboxes"></div>
+        <br>
+
+        <label>Im Onlineshop:</label><br>
+        <div id="onlineshopFilterGroup">
+            <label><input checked name="onlineshopFilter" onchange="applyFiltersFromPopup()" type="radio" value=""> Alle</label>
+            <label><input name="onlineshopFilter" onchange="applyFiltersFromPopup()" type="radio" value="Yes"> Ja</label>
+            <label><input name="onlineshopFilter" onchange="applyFiltersFromPopup()" type="radio" value="No"> Nein</label>
+        </div>
+    </div>
+</div>
+
+<div id="settingsPopup" class="popup-container">
+    <h3>Einstellungen</h3>
+    <button class="close" onclick="closeSettingsPopup()"><i class="fa fa-close"></i></button>
+    <div class="popup-body">
+        <label><input id="numbersTogglePopup" onclick="applySettingsFromPopup()" type="checkbox"/> Baumnummern ausblenden</label><br><br>
+        <label><input id="hideFilterchips" onclick="applySettingsFromPopup()" type="checkbox"/> Filterchips ausblenden</label><br><br>
+        <label><input id="colorCodingTogglePopup" checked onclick="applySettingsFromPopup()" type="checkbox"/> Farbkodierung einschalten</label><br><br>
+        <label><input id="hideLocationTogglePopup" onclick="applySettingsFromPopup()" type="checkbox"/> Aktuellen Standort ausblenden</label><br><br>
+        <label><input id="followLocationTogglePopup" onclick="applySettingsFromPopup()" type="checkbox"/> Aktuellem Standort folgen</label>
+    </div>
+</div>
+
+<div id="editModal" class="popup-container">
+    <h3>Filterchip bearbeiten</h3>
+    <button class="close" onclick="closeEditModal()"><i class="fa fa-close"></i></button>
+    <div id="editModalBody" class="popup-body"></div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script>
+    // =========================== CONSTANTS ===========================
+    const PRICE_LIST = [
+        0, 590, 890, 1190, 1200, 1390,
+        2890, 3490, 3990, 4490, 4990,
+        5490, 5990, 6490, 6990, 7490
+    ];
+    const STANDARD_GRABARTEN = [
+        "Basisplatz", "Platz", "Baum", "Einzelbaum", "Familienbaum",
+        "Freundschaftsbaum", "Partnerbaum",
+        "Basisgemeinschaftsbaum-Platz", "Gemeinschaftsbaum-Platz",
+        "Prachtgemeinschaftsbaum-Platz", "Sternschnuppenbaum-Platz"
+    ];
+    const BAUMART_LIST = [
+        "Ahorn", "Apfel", "Birke", "Birne", "Blutbuche", "Buche", "Douglasie",
+        "Eberesche", "Eiche", "Elsbeere", "Fichte", "Hainbuche", "Haselnuss",
+        "Holunder", "Kiefer", "Kirsche", "Lärche", "Linde", "Mehlbeere",
+        "Pflanzplatz", "Tanne", "Ulme", "Walnuss", "Weide", "Wildapfel", "Wildbirne"
+    ];
+    const AREA_LIST = [1, 2, 3, 4, 5, 6, 7];
+    // Price → marker color when color-coding is on. Ranges (±50€) handled in priceColorFor().
+    const PRICE_COLORS = {
+        890:  { fill: "blue",       border: "yellow" },
+        1190: { fill: "green",      border: "yellow" },
+        1200: { fill: "green",      border: "yellow" },
+        1390: { fill: "black",      border: "yellow" },
+        2890: { fill: "lightpink",  border: "lightpink" },
+        3490: { fill: "white",      border: "white" },
+        3990: { fill: "grey",       border: "grey" },
+        4490: { fill: "lightgreen", border: "lightgreen" },
+        4990: { fill: "#eb5e5b",    border: "#eb5e5b" },
+        5490: { fill: "purple",     border: "purple" },
+        5990: { fill: "brown",      border: "brown" },
+        6490: { fill: "black",      border: "black" },
+        6990: { fill: "orange",     border: "orange" },
+        7490: { fill: "lightblue",  border: "lightblue" }
+    };
+
+    function priceColorFor(price) {
+        // Match either exact PRICE_LIST entries or canonical ±50 buckets like 2800-2900.
+        if (PRICE_COLORS[price]) return PRICE_COLORS[price];
+        for (const key of Object.keys(PRICE_COLORS)) {
+            const k = parseInt(key, 10);
+            if (price >= k - 90 && price <= k) return PRICE_COLORS[key];
+        }
+        return null;
+    }
+
+    // =========================== MAP SETUP ===========================
+    function adjustMapHeight() {
+        document.getElementById("map").style.height = `${window.innerHeight}px`;
+    }
+    window.addEventListener("load", adjustMapHeight);
+    window.addEventListener("resize", adjustMapHeight);
+
+    const map = L.map('map', { minZoom: 0, maxZoom: 22 }).setView([48.39215, 9.47992], 19);
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 22,
+        maxNativeZoom: 19
+    }).addTo(map);
+
+    // =========================== POPUP REFS ===========================
+    const filterPopup = document.getElementById('filterPopup');
+    const settingsPopup = document.getElementById('settingsPopup');
+    const filterChipsContainer = document.getElementById('filterChips');
+
+    function openFilterPopup() {
+        closeEditModal();
+        if (filterPopup.style.display === "block") {
+            filterPopup.style.display = "none";
+        } else {
+            filterPopup.style.display = "block";
+            closeSettingsPopup();
+        }
+    }
+    function closeFilterPopup() { filterPopup.style.display = 'none'; }
+
+    function openSettingsPopup() {
+        closeEditModal();
+        if (settingsPopup.style.display === "block") {
+            settingsPopup.style.display = "none";
+        } else {
+            settingsPopup.style.display = "block";
+            closeFilterPopup();
+        }
+    }
+    function closeSettingsPopup() { settingsPopup.style.display = 'none'; }
+
+    // ================== FILTER & TOGGLE STATE ==================
+    let grabartFilter = "";
+    let baumpreisFilter = [];
+    let baumartFilter = "";
+    let areaFilter = [];
+    let filterOnlineYes = false;
+    let filterOnlineNo = false;
+
+    let hideOccupied = true;
+    let hideNumbers = false;
+    let hideFilterchips = false;
+    let enableColorCoding = true;
+    let hideLocation = false;
+    let followLocation = false;
+
+    let lastVisibleCount = 0;
+
+    // ================== POPULATE FILTER UI FROM CONSTANTS ==================
+    (function buildFilterUi() {
+        const priceBox = document.getElementById('baumpreisCheckboxes');
+        const priceHtml = PRICE_LIST.map((price, i) => {
+            const br = (i % 3 === 2 && i < PRICE_LIST.length - 1) ? "<br>" : "";
+            return `<label><input onclick="applyFiltersFromPopup()" type="checkbox" value="${price}"/> ${price}</label>${br}`;
+        }).join("");
+        priceBox.innerHTML = priceHtml + `<br><label><input onclick="applyFiltersFromPopup()" type="checkbox" value="andere"/> andere...</label>`;
+
+        const baumartSelect = document.getElementById('baumartSelect');
+        baumartSelect.innerHTML = `<option value="">Alle</option>` +
+            BAUMART_LIST.map(b => `<option value="${b}">${b}</option>`).join("");
+
+        const areaBox = document.getElementById('areaCheckboxes');
+        areaBox.innerHTML = AREA_LIST.map(a =>
+            `<label><input onclick="applyFiltersFromPopup()" type="checkbox" value="${a}"/> ${a}</label>`
+        ).join(" ");
+    })();
+
+    // ================== CONDENSE BAUMPREIS FOR CHIP ==================
+    function condenseBaumpreisValues(values) {
+        let hasOther = false;
+        const numericValues = [];
+        for (const v of values) {
+            if (v === "andere") hasOther = true;
+            else numericValues.push(v);
+        }
+        numericValues.sort((a, b) => a - b);
+        const indices = numericValues.map(n => PRICE_LIST.indexOf(n)).filter(i => i >= 0);
+
+        const result = [];
+        let i = 0;
+        while (i < indices.length) {
+            let start = indices[i], end = start, j = i;
+            while (j + 1 < indices.length && indices[j + 1] === indices[j] + 1) {
+                end = indices[j + 1];
+                j++;
+            }
+            result.push(start === end
+                ? PRICE_LIST[start] + "€"
+                : `${PRICE_LIST[start]}-${PRICE_LIST[end]}€`);
+            i = j + 1;
+        }
+        if (hasOther) result.push("andere");
+        if (result.length > 1) {
+            return result.slice(0, -2).join(", ")
+                + (result.length > 2 ? ", " : "")
+                + result.slice(-2).join(" & ");
+        }
+        return result.join(", ");
+    }
+
+    // ================== READ INPUTS → STATE ==================
+    function applyFiltersFromPopup() {
+        const occupiedToggle = document.getElementById("occupiedTogglePopup");
+        if (occupiedToggle) hideOccupied = occupiedToggle.checked;
+
+        const baumartSelect = document.getElementById("baumartSelect");
+        if (baumartSelect) baumartFilter = baumartSelect.value;
+
+        const checked = document.querySelectorAll('#baumpreisCheckboxes input[type="checkbox"]:checked');
+        baumpreisFilter = Array.from(checked).map(cb =>
+            cb.value === "andere" ? "andere" : parseInt(cb.value, 10)
+        );
+
+        const grabartSelect = document.getElementById("grabartSelect");
+        if (grabartSelect) grabartFilter = grabartSelect.value;
+
+        const areaChecked = document.querySelectorAll('#areaCheckboxes input[type="checkbox"]:checked');
+        areaFilter = Array.from(areaChecked).map(cb => parseInt(cb.value, 10));
+
+        const selectedRadio = document.querySelector('input[name="onlineshopFilter"]:checked');
+        filterOnlineYes = selectedRadio.value === "Yes";
+        filterOnlineNo = selectedRadio.value === "No";
+
+        rebuildFilterChips();
+        applyFilters();
+    }
+
+    function cleanBaumpreisCheckboxes() {
+        document.querySelectorAll('#baumpreisCheckboxes input[type=checkbox]').forEach(cb => cb.checked = false);
+    }
+
+    function applyFiltersFromLegend(type, value) {
+        cleanBaumpreisCheckboxes();
+        if (type === "Grabart") {
+            document.getElementById("grabartSelect").value = value;
+            applyFiltersFromPopup();
+            return;
+        }
+        if (type === "price") {
+            grabartFilter = "";
+            document.querySelectorAll('#baumpreisCheckboxes input[type=checkbox]').forEach(cb => {
+                if (cb.value === value) cb.checked = true;
+            });
+            const checked = document.querySelectorAll('#baumpreisCheckboxes input[type=checkbox]:checked');
+            baumpreisFilter = Array.from(checked).map(cb =>
+                cb.value === "andere" ? "andere" : parseInt(cb.value, 10)
+            );
+            if (value === "0") hideOccupied = false;
+        }
+        rebuildFilterChips();
+        applyFilters();
+    }
+
+    function applySettingsFromPopup() {
+        hideNumbers = document.getElementById('numbersTogglePopup').checked;
+        hideFilterchips = document.getElementById('hideFilterchips').checked;
+        enableColorCoding = document.getElementById('colorCodingTogglePopup').checked;
+        hideLocation = document.getElementById('hideLocationTogglePopup').checked;
+        followLocation = document.getElementById('followLocationTogglePopup').checked;
+        rebuildFilterChips();
+        toggleLocation();
+        toggleFollow();
+        applyFilters();
+    }
+
+    // ================== FILTER CHIPS ==================
+    function hasActiveFilters() {
+        return hideOccupied || grabartFilter || baumartFilter
+            || baumpreisFilter.length > 0 || areaFilter.length > 0
+            || filterOnlineYes || filterOnlineNo;
+    }
+
+    function resetAllFilters() {
+        hideOccupied = false;
+        grabartFilter = "";
+        baumartFilter = "";
+        baumpreisFilter = [];
+        areaFilter = [];
+        filterOnlineYes = false;
+        filterOnlineNo = false;
+
+        document.getElementById("occupiedTogglePopup").checked = false;
+        document.getElementById("grabartSelect").value = "";
+        document.getElementById("baumartSelect").value = "";
+        cleanBaumpreisCheckboxes();
+        document.querySelectorAll('#areaCheckboxes input[type=checkbox]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="onlineshopFilter"]').forEach(r => r.checked = r.value === "");
+        closeEditModal();
+        rebuildFilterChips();
+        applyFilters();
+    }
+
+    function updateResultCount() {
+        const el = document.getElementById('resultCountChip');
+        if (el) el.textContent = `${lastVisibleCount} Bäume`;
+    }
+
+    function rebuildFilterChips() {
+        filterChipsContainer.innerHTML = "";
+
+        if (!hideFilterchips) {
+            const countChip = document.createElement('div');
+            countChip.className = 'chip chip-count';
+            countChip.id = 'resultCountChip';
+            countChip.textContent = `${lastVisibleCount} Bäume`;
+            filterChipsContainer.appendChild(countChip);
+
+            if (hasActiveFilters()) {
+                const reset = document.createElement('div');
+                reset.className = 'chip chip-reset';
+                reset.innerHTML = `<i class="fa fa-times-circle"></i> Filter zurücksetzen`;
+                reset.onclick = resetAllFilters;
+                filterChipsContainer.appendChild(reset);
+            }
+        }
+
+        if (hideOccupied) addChip("Besetzte ausblenden", "");
+        if (grabartFilter) addChip("Grabart", grabartFilter);
+        if (baumpreisFilter.length > 0) addChip("Baumpreis", condenseBaumpreisValues(baumpreisFilter));
+        if (baumartFilter) addChip("Baumart", baumartFilter);
+        if (areaFilter.length > 0) addChip("Gebiet", areaFilter.join(", "));
+        if (filterOnlineYes) addChip("Im Onlineshop", "Ja");
+        if (filterOnlineNo) addChip("Im Onlineshop", "Nein");
+    }
+
+    function addChip(label, value) {
+        if (hideFilterchips) return;
+        const chip = document.createElement('div');
+        chip.classList.add('chip');
+        chip.innerHTML = value
+            ? `${label}: ${value} <span onclick="removeChip(this)">&times;</span>`
+            : `${label} <span onclick="removeChip(this)">&times;</span>`;
+        chip.onclick = (e) => { if (e.target.tagName !== "SPAN") editChip(label, value); };
+        filterChipsContainer.appendChild(chip);
+    }
+
+    function editChip(label) { openEditModal(label); }
+
+    let currentEditingChipLabel = null;
+
+    function openEditModal(label) {
+        if (label === "Besetzte ausblenden") return;
+        if (currentEditingChipLabel === label) { closeEditModal(); return; }
+        closeFilterPopup();
+        closeSettingsPopup();
+        currentEditingChipLabel = label;
+        const modalBody = document.getElementById("editModalBody");
+        modalBody.innerHTML = "";
+
+        switch (label) {
+            case "Baumart": {
+                const opts = `<option value="">Alle</option>` +
+                    BAUMART_LIST.map(b => `<option value="${b}">${b}</option>`).join("");
+                modalBody.innerHTML = `<select id="baumartSelectModal" onchange="applyFiltersFromModal()">${opts}</select>`;
+                document.getElementById("baumartSelectModal").value = baumartFilter;
+                break;
+            }
+            case "Baumpreis": {
+                const priceHtml = PRICE_LIST.map(price =>
+                    `<label><input type="checkbox" value="${price}" ${baumpreisFilter.includes(price) ? "checked" : ""} onchange="applyFiltersFromModal()"> ${price}</label>`
+                ).join(" ");
+                modalBody.innerHTML = `<div id="baumpreisCheckboxesModal">${priceHtml}<label><input type="checkbox" value="andere" ${baumpreisFilter.includes("andere") ? "checked" : ""} onchange="applyFiltersFromModal()"> andere...</label></div>`;
+                break;
+            }
+            case "Grabart": {
+                const opts = `<option value="">Alle</option>` +
+                    STANDARD_GRABARTEN.map(g => `<option value="${g}">${g}</option>`).join("") +
+                    `<option value="andere">andere...</option>`;
+                modalBody.innerHTML = `<select id="grabartSelectModal" onchange="applyFiltersFromModal()">${opts}</select>`;
+                document.getElementById("grabartSelectModal").value = grabartFilter;
+                break;
+            }
+            case "Gebiet": {
+                const html = AREA_LIST.map(a =>
+                    `<label><input type="checkbox" value="${a}" ${areaFilter.includes(a) ? "checked" : ""} onchange="applyFiltersFromModal()"> ${a}</label>`
+                ).join(" ");
+                modalBody.innerHTML = `<div id="areaCheckboxesModal">${html}</div>`;
+                break;
+            }
+            case "Im Onlineshop":
+                modalBody.innerHTML = `<div id="onlineshopFilterGroupModal">
+                    <label><input type="radio" name="onlineshopFilterModal" value="" ${!filterOnlineYes && !filterOnlineNo ? "checked" : ""} onchange="applyFiltersFromModal()"> Alle</label>
+                    <label><input type="radio" name="onlineshopFilterModal" value="Yes" ${filterOnlineYes ? "checked" : ""} onchange="applyFiltersFromModal()"> Ja</label>
+                    <label><input type="radio" name="onlineshopFilterModal" value="No" ${filterOnlineNo ? "checked" : ""} onchange="applyFiltersFromModal()"> Nein</label>
+                </div>`;
+                break;
+        }
+        document.getElementById("editModal").style.display = "block";
+    }
+
+    function applyFiltersFromModal() {
+        const baumartSelect = document.getElementById("baumartSelectModal");
+        if (baumartSelect) baumartFilter = baumartSelect.value;
+
+        const baumpreisChecked = document.querySelectorAll('#baumpreisCheckboxesModal input[type="checkbox"]:checked');
+        if (document.getElementById('baumpreisCheckboxesModal')) {
+            baumpreisFilter = Array.from(baumpreisChecked).map(cb =>
+                cb.value === "andere" ? "andere" : parseInt(cb.value, 10)
+            );
+        }
+
+        const grabartSelect = document.getElementById("grabartSelectModal");
+        if (grabartSelect) grabartFilter = grabartSelect.value;
+
+        const areaChecked = document.querySelectorAll('#areaCheckboxesModal input[type="checkbox"]:checked');
+        if (document.getElementById('areaCheckboxesModal')) {
+            areaFilter = Array.from(areaChecked).map(cb => parseInt(cb.value, 10));
+        }
+
+        const onlineshopRadio = document.querySelector('input[name="onlineshopFilterModal"]:checked');
+        if (onlineshopRadio) {
+            filterOnlineYes = onlineshopRadio.value === "Yes";
+            filterOnlineNo = onlineshopRadio.value === "No";
+        }
+
+        syncFilterPopups();
+        rebuildFilterChips();
+        applyFilters();
+    }
+
+    function syncFilterPopups() {
+        document.getElementById("baumartSelect").value = baumartFilter;
+        document.querySelectorAll('#baumpreisCheckboxes input[type="checkbox"]').forEach(cb => {
+            cb.checked = baumpreisFilter.includes(cb.value === "andere" ? "andere" : parseInt(cb.value, 10));
+        });
+        document.getElementById("grabartSelect").value = grabartFilter;
+        document.querySelectorAll('#areaCheckboxes input[type="checkbox"]').forEach(cb => {
+            cb.checked = areaFilter.includes(parseInt(cb.value, 10));
+        });
+        document.querySelectorAll('input[name="onlineshopFilter"]').forEach(r => {
+            if (r.value === "Yes") r.checked = filterOnlineYes;
+            else if (r.value === "No") r.checked = filterOnlineNo;
+            else r.checked = !filterOnlineYes && !filterOnlineNo;
+        });
+    }
+
+    function closeEditModal() {
+        document.getElementById("editModal").style.display = "none";
+        currentEditingChipLabel = null;
+    }
+
+    function removeChip(spanElement) {
+        const chipText = spanElement.parentElement.textContent.trim();
+        if (chipText.startsWith("Besetzte ausblenden")) {
+            hideOccupied = false;
+            document.getElementById("occupiedTogglePopup").checked = false;
+        } else if (chipText.startsWith("Grabart:")) {
+            grabartFilter = "";
+            document.getElementById("grabartSelect").value = "";
+            if (currentEditingChipLabel === "Grabart") closeEditModal();
+        } else if (chipText.startsWith("Baumpreis:")) {
+            baumpreisFilter = [];
+            cleanBaumpreisCheckboxes();
+            if (currentEditingChipLabel === "Baumpreis") closeEditModal();
+        } else if (chipText.startsWith("Baumart:")) {
+            baumartFilter = "";
+            document.getElementById("baumartSelect").value = "";
+            if (currentEditingChipLabel === "Baumart") closeEditModal();
+        } else if (chipText.startsWith("Gebiet:")) {
+            areaFilter = [];
+            document.querySelectorAll("#areaCheckboxes input[type=checkbox]").forEach(cb => cb.checked = false);
+            if (currentEditingChipLabel === "Gebiet") closeEditModal();
+        } else if (chipText.startsWith("Im Onlineshop:")) {
+            filterOnlineYes = false;
+            filterOnlineNo = false;
+            document.querySelectorAll('input[name="onlineshopFilter"]').forEach(r => r.checked = r.value === "");
+            if (currentEditingChipLabel === "Im Onlineshop") closeEditModal();
+        }
+        rebuildFilterChips();
+        applyFilters();
+    }
+
+    function toggleLegend() {
+        const legend = document.getElementById('mapLegend');
+        legend.style.display = (legend.style.display === 'none' || legend.style.display === '') ? 'block' : 'none';
+    }
+
+    // ====================== KEYBOARD / OUTSIDE-CLICK DISMISS ======================
+    function closeAllPopups() {
+        closeFilterPopup();
+        closeSettingsPopup();
+        closeEditModal();
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeAllPopups();
+    });
+
+    document.addEventListener('mousedown', (e) => {
+        const ids = ['filterPopup', 'settingsPopup', 'editModal'];
+        const anyOpen = ids.map(id => document.getElementById(id))
+            .some(el => el && el.style.display === 'block');
+        if (!anyOpen) return;
+        if (e.target.closest('.popup-container, .filter-chips, .search-bar, .settings-button, .map-legend')) return;
+        closeAllPopups();
+    });
+
+    // =========================== DATA / RENDERING ===========================
+    let treeData = [];
+    let markerLayerGroup = L.layerGroup().addTo(map);
+
+    // The selected forest, populated from the WFS vw_standort layer once at startup.
+    let currentWald = null;           // { kennung, name, slug, bounds: L.LatLngBounds }
+    let waldByKennung = {};           // kennung -> { kennung, name, slug, bounds }
+
+    function transliterateGerman(s) {
+        return s
+            .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue")
+            .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss");
+    }
+
+    // Friedwald.de uses a short slug per forest — usually the location name only,
+    // stripped of qualifiers like "im Biosphärengebiet ...", "am Schwanberg", "bei X".
+    // e.g. "Münsingen im Biosphärengebiet Schwäbische Alb" -> "muensingen".
+    function slugifyWaldName(name) {
+        if (!name) return "";
+        const trimmed = name.split(/\s+(im|am|bei|in|an der|an dem|auf der|auf dem)\s+/i)[0];
+        return transliterateGerman(trimmed)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+    }
+
+    // Convert a (Multi)Polygon geometry in EPSG:4326 to a Leaflet bounds.
+    function geometryToBounds(geom) {
+        if (!geom) return null;
+        const rings = geom.type === "MultiPolygon" ? geom.coordinates.flat()
+            : geom.type === "Polygon" ? geom.coordinates
+                : [];
+        const latLngs = [];
+        for (const ring of rings) for (const [lon, lat] of ring) latLngs.push([lat, lon]);
+        return latLngs.length ? L.latLngBounds(latLngs) : null;
+    }
+
+    function toTitleCase(str) {
+        if (!str) return "";
+        return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+    }
+
+    function webMercatorToLatLon(x, y) {
+        const r_major = 6378137.0;
+        const lon = (x / r_major) * 180.0 / Math.PI;
+        const lat = 180.0 / Math.PI * (2 * Math.atan(Math.exp(y / r_major)) - Math.PI / 2.0);
+        return [lat, lon];
+    }
+
+    function mapAttributes(properties, coords) {
+        const p = {};
+        for (const key in properties) p[key.toLowerCase()] = properties[key];
+
+        const [lat, lon] = webMercatorToLatLon(coords[0], coords[1]);
+        const rawNum = p.baumnummer || p.baum_nr || "0";
+        const number = rawNum.toString().padStart(3, '0');
+
+        let onlineStr = "Nicht im Onlineshop verfügbar.";
+        const onlineVal = p.onlineshop_verfuegbar || p.onlineshop || "";
+        if (typeof onlineVal === 'string' && onlineVal.includes("Nur")) onlineStr = "Nur im Onlineshop verfügbar.";
+        else if (onlineVal === true || onlineVal === "true" || onlineVal === 1) onlineStr = "Nur im Onlineshop verfügbar.";
+
+        let status = "frei";
+        const statusVal = String(p.status || p.baumstatus || "frei").toLowerCase();
+        if (statusVal === 'belegt' || statusVal === 'verkauft' || statusVal === 'reserviert') status = "belegt";
+
+        let rawGrabart = p.grabart || p.baumtyp || "Baum";
+        let grabart = toTitleCase(rawGrabart);
+        if (grabart === "Basisgemeinschaftsbaum-platz") grabart = "Basisgemeinschaftsbaum-Platz";
+        if (grabart === "Gemeinschaftsbaum-platz") grabart = "Gemeinschaftsbaum-Platz";
+        if (grabart === "Prachtgemeinschaftsbaum-platz") grabart = "Prachtgemeinschaftsbaum-Platz";
+        if (grabart === "Sternschnuppenbaum-platz") grabart = "Sternschnuppenbaum-Platz";
+
+        let rawPrice = p.baumpreis_brutto || p.preis_brutto || p.preis || "0";
+        if (typeof rawPrice === 'string') rawPrice = rawPrice.replace(/\./g, "").replace(",", ".");
+        const price = Math.round(parseFloat(rawPrice));
+
+        let freiePlaetze = parseInt(p.anzahl_frei, 10);
+        if (isNaN(freiePlaetze)) freiePlaetze = (status === "frei") ? 1 : 0;
+
+        return {
+            lat, lon,
+            Waldname: p.waldname || "Münsingen",
+            Grabart: grabart,
+            baumstatus: status,
+            baumart: toTitleCase(p.baumart || "Buche"),
+            onlineshop: onlineStr,
+            baumpreis: price,
+            area: parseInt(p.bestattungsflaeche || p.flaeche || 0, 10),
+            freiePlaetze,
+            number
+        };
+    }
+
+    // corsproxy.io free plan now rejects non-browser requests with 403/413; codetabs still allows.
+    const PROXY_URL = "https://api.codetabs.com/v1/proxy/?quest=";
+    const GEOSERVER_WFS = "https://gis.friedwald.de/geoserver/wfs";
+
+    function wfsUrl(typeName, extraParams = {}) {
+        const p = new URLSearchParams({
+            service: "WFS",
+            version: "1.1.0",
+            request: "GetFeature",
+            typeName,
+            outputFormat: "application/json",
+            maxFeatures: "100000",
+            ...extraParams
+        });
+        return PROXY_URL + encodeURIComponent(GEOSERVER_WFS + "?" + p.toString());
+    }
+
+    function setLoading(msg, error = false) {
+        const el = document.getElementById('loadingIndicator');
+        if (!el) return;
+        if (msg === null) { el.style.display = 'none'; return; }
+        el.style.display = 'block';
+        el.innerText = msg;
+        el.style.backgroundColor = error ? "red" : "rgba(0, 0, 0, 0.8)";
+    }
+
+    async function loadWaldSites() {
+        setLoading("Lade FriedWald-Standorte…");
+        const url = wfsUrl("gis_friedwald:vw_standort", { srsName: "EPSG:4326" });
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Standorte: HTTP ${response.status}`);
+        const data = await response.json();
+        if (!data.features) throw new Error("Standorte: keine Features.");
+
+        const sites = data.features
+            .map(f => {
+                const p = f.properties || {};
+                const kennung = p.waldkennung;
+                const name = p.waldname || p.friedwald_waldname || kennung;
+                if (!kennung) return null;
+                return {
+                    kennung,
+                    name,
+                    slug: slugifyWaldName(p.waldname || kennung),
+                    bounds: geometryToBounds(f.geometry)
+                };
+            })
+            .filter(s => s && s.bounds)
+            .sort((a, b) => a.name.localeCompare(b.name, "de"));
+
+        waldByKennung = Object.fromEntries(sites.map(s => [s.kennung, s]));
+
+        const sel = document.getElementById('waldSelect');
+        sel.innerHTML = `<option value="">FriedWald wählen…</option>` +
+            sites.map(s => `<option value="${s.kennung}">${s.name}</option>`).join("");
+
+        return sites;
+    }
+
+    async function fetchTreesFor(kennung) {
+        const wald = waldByKennung[kennung];
+        if (!wald) throw new Error(`Unbekannter Wald: ${kennung}`);
+        setLoading(`Lade Baumdaten für ${wald.name}…`);
+
+        const url = wfsUrl("gis_friedwald:vw_baum_public", {
+            srsName: "EPSG:3857",
+            cql_filter: `waldkennung='${kennung}'`
+        });
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Bäume: HTTP ${response.status}`);
+        const data = await response.json();
+        if (!data.features) throw new Error("Bäume: keine Features.");
+
+        treeData = data.features
+            .map(f => mapAttributes(f.properties, f.geometry.coordinates))
+            .filter(t => t !== null);
+
+        currentWald = wald;
+        map.fitBounds(wald.bounds, { maxZoom: 18 });
+        rebuildFilterChips();
+        applyFilters();
+        setLoading(null);
+    }
+
+    function onWaldChange() {
+        const kennung = document.getElementById('waldSelect').value;
+        if (!kennung) return;
+        try { localStorage.setItem("friedwald.kennung", kennung); } catch (_) {}
+        fetchTreesFor(kennung).catch(err => {
+            console.error(err);
+            setLoading("Fehler: " + err.message, true);
+        });
+    }
+
+    (async function boot() {
+        try {
+            const sites = await loadWaldSites();
+            let initial = null;
+            try { initial = localStorage.getItem("friedwald.kennung"); } catch (_) {}
+            if (!initial || !waldByKennung[initial]) {
+                initial = waldByKennung["MSG"] ? "MSG" : sites[0]?.kennung;
+            }
+            if (initial) {
+                document.getElementById('waldSelect').value = initial;
+                await fetchTreesFor(initial);
+            } else {
+                setLoading("Keine FriedWald-Standorte gefunden.", true);
+            }
+        } catch (err) {
+            console.error(err);
+            setLoading("Fehler: " + err.message, true);
+        }
+    })();
+
+    // ===== filter predicates (true keeps tree) =====
+    const FILTER_PREDICATES = [
+        tree => !hideOccupied || tree.baumstatus !== "belegt",
+        tree => {
+            if (!grabartFilter) return true;
+            if (grabartFilter === "andere") return !STANDARD_GRABARTEN.includes(tree.Grabart);
+            return tree.Grabart === grabartFilter;
+        },
+        tree => {
+            if (baumpreisFilter.length === 0) return true;
+            const hasAndere = baumpreisFilter.includes("andere");
+            if (baumpreisFilter.includes(tree.baumpreis)) return true;
+            return hasAndere && !PRICE_LIST.includes(tree.baumpreis);
+        },
+        tree => !baumartFilter || tree.baumart === baumartFilter,
+        tree => areaFilter.length === 0 || areaFilter.includes(tree.area),
+        tree => !filterOnlineYes || tree.onlineshop.includes("Nur"),
+        tree => !filterOnlineNo || !tree.onlineshop.includes("Nur")
+    ];
+
+    function getMarkerColors(tree) {
+        if (tree.baumstatus === "belegt" || (tree.freiePlaetze === 0 && tree.baumstatus !== "frei")) {
+            return { fill: "red", border: "red" };
+        }
+        if (!enableColorCoding) return { fill: "darkgrey", border: "green" };
+        if (tree.baumpreis === 590 || tree.Grabart === "Basisplatz") {
+            return { fill: "yellow", border: "yellow" };
+        }
+        const c = priceColorFor(tree.baumpreis);
+        if (c) return c;
+        return { fill: "darkgrey", border: "green" };
+    }
+
+    function applyFilters() {
+        markerLayerGroup.clearLayers();
+        let visible = 0;
+
+        for (const tree of treeData) {
+            if (!FILTER_PREDICATES.every(p => p(tree))) continue;
+            visible++;
+
+            const { fill, border } = getMarkerColors(tree);
+            const popup = generateTreeLabel(tree);
+
+            markerLayerGroup.addLayer(L.circleMarker([tree.lat, tree.lon], {
+                radius: 8,
+                color: border,
+                fillColor: fill,
+                fillOpacity: 0.7
+            }).bindPopup(popup));
+
+            if (!hideNumbers) {
+                markerLayerGroup.addLayer(L.marker([tree.lat, tree.lon], {
+                    icon: L.divIcon({
+                        className: 'tree-number-label',
+                        html: `<span style="color: black; font-size: 12px;">${tree.number}</span>`,
+                        iconSize: [100, 20],
+                        iconAnchor: [50, -10]
+                    })
+                }).bindPopup(popup));
+            }
+        }
+
+        lastVisibleCount = visible;
+        updateResultCount();
+    }
+
+    function generateTreeLabel(tree) {
+        const w3wLink = `<b>W3W:</b> <a href="https://what3words.com/${tree.lat},${tree.lon}" target="_blank">${tree.lat.toFixed(5)}, ${tree.lon.toFixed(5)}</a><br>`;
+
+        let onlineLink = "";
+        if (tree.onlineshop.includes("Nur") && tree.baumstatus !== "belegt" && currentWald) {
+            const kennungLower = currentWald.kennung.toLowerCase();
+            const grabartLower = tree.Grabart.toLowerCase();
+            onlineLink = `<br><b>Onlineshop:</b> <a href="https://www.friedwald.de/detailseite/${currentWald.slug}/${kennungLower}-${grabartLower}-${tree.number}" target="_blank">Hier klicken</a><br>`;
+        }
+
+        return `
+            <b>Waldname:</b> ${tree.Waldname}<br>
+            <b>Grabart:</b> ${tree.Grabart}<br>
+            <b>Area:</b> ${tree.area}<br>
+            <b>Baumstatus:</b> ${tree.baumstatus}<br>
+            <b>Baumpreis:</b> ${tree.baumpreis} €<br>
+            <b>Baumart:</b> ${tree.baumart}<br>
+            <b>Freie Plätze:</b> ${tree.freiePlaetze}<br>
+            ${w3wLink}
+            ${onlineLink}
+        `;
+    }
+
+    // ====================== LOCATION ======================
+    let currentLocationMarker;
+    let currentLocationCircle;
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude, accuracy } = position.coords;
+                if (!currentLocationMarker) {
+                    currentLocationMarker = L.marker([latitude, longitude]).bindPopup("You are here");
+                    currentLocationCircle = L.circle([latitude, longitude], {
+                        radius: accuracy, color: "#3388ff", fillColor: "#3388ff", fillOpacity: 0.2
+                    });
+                }
+                currentLocationMarker.setLatLng([latitude, longitude]);
+                currentLocationCircle.setLatLng([latitude, longitude]).setRadius(accuracy);
+
+                if (!hideLocation) {
+                    currentLocationMarker.addTo(map);
+                    currentLocationCircle.addTo(map);
+                } else {
+                    map.removeLayer(currentLocationMarker);
+                    map.removeLayer(currentLocationCircle);
+                }
+                if (followLocation) map.setView([latitude, longitude], map.getZoom());
+            },
+            (error) => {
+                console.error("Geolocation error:", error);
+                if (error.code === error.PERMISSION_DENIED) {
+                    hideLocation = true;
+                    followLocation = false;
+                }
+            },
+            { enableHighAccuracy: true, maximumAge: 0 }
+        );
+    }
+
+    function toggleLocation() {
+        if (hideLocation) {
+            if (currentLocationMarker) map.removeLayer(currentLocationMarker);
+            if (currentLocationCircle) map.removeLayer(currentLocationCircle);
+        } else {
+            if (currentLocationMarker) currentLocationMarker.addTo(map);
+            if (currentLocationCircle) currentLocationCircle.addTo(map);
+        }
+    }
+
+    function toggleFollow() {
+        followLocation = document.getElementById("followLocationTogglePopup").checked;
+    }
+
+    // ====================== SEARCH ======================
+    function searchTree() {
+        const searchNumber = document.getElementById('treeNumberInput').value.trim();
+        if (!searchNumber) return alert('Bitte geben Sie eine gültige Baumnummer ein.');
+        const tree = treeData.find(t => t.number === searchNumber);
+        if (!tree) return alert('Baum nicht gefunden (oder Daten laden noch).');
+        map.setView([tree.lat, tree.lon], 19);
+        L.popup().setLatLng([tree.lat, tree.lon]).setContent(generateTreeLabel(tree)).openOn(map);
+    }
+
+    function handleEnter(event) {
+        if (event.key === "Enter") searchTree();
+    }
+
+    function disableZoom() {
+        document.querySelector("meta[name=viewport]").setAttribute("content", "width=device-width, initial-scale=1.0, user-scalable=no");
+    }
+
+    function enableZoom() {
+        document.querySelector("meta[name=viewport]").setAttribute("content", "width=device-width, initial-scale=1.0, user-scalable=yes");
+    }
+</script>
+</body>
+</html>
